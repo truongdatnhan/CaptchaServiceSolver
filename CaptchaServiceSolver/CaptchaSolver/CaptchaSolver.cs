@@ -25,7 +25,7 @@ namespace CaptchaServiceSolver.CaptchaSolver
             client.DefaultRequestHeaders.Add("Connection", "keep-alive");
         }
 
-        public abstract Task<string?> SendCaptchaAsync(RecaptchaChallenge key);
+        public abstract Task<(string? taskId, string? error)> SendCaptchaAsync();
         public abstract Task<CaptchaResult?> GetCaptchaAnswerAsync(string captchaId);
     }
 }

@@ -1,5 +1,6 @@
 ﻿using CaptchaServiceSolver.Models;
 using CaptchaServiceSolver.Requests.AntiCaptcha;
+using CaptchaServiceSolver.Responses.AntiCaptcha;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using System;
@@ -8,6 +9,7 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 using System.Web;
 
@@ -15,118 +17,85 @@ namespace CaptchaServiceSolver.CaptchaSolver
 {
     public class AntiCaptcha : CaptchaSolver
     {
-        public override async Task<string?> SendCaptchaAsync(RecaptchaChallenge key)
+        public AntiCaptchaRequest Request { get; set; }
+
+        public AntiCaptcha(AntiCaptchaRequest request) : base()
         {
-            var taskRequest = new AntiCaptchaTask(key.Type,key.WebsiteUrl,key.Sitekey, key.WebsiteUrl);
+            this.Request = request;
+        }
 
-            var requestObject = new AntiCaptchaRequest();
-
-            var response = await client.GetAsync(uriBuilderSend.Uri.ToString());
-            var result = await response.Content.ReadAsStringAsync();
+        public override async Task<(string? taskId, string? error)> SendCaptchaAsync()
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Post, Util.ANTI_CAPTCHA_SEND);
+            var content = new StringContent(JsonConvert.SerializeObject(Request), Encoding.UTF8, "application/json");
+            request.Content = content;
+            var responseMessage = await client.SendAsync(request);
+            if (!responseMessage.IsSuccessStatusCode)
+            {
+                return (null, "HTTP FAIL !");
+            }
+            var result = await responseMessage.Content.ReadAsStringAsync();
 
             var json = JObject.Parse(result);
-            var statusSend = (string?)json.GetValue("status");
-            var requestSend = (string?)json.GetValue("request");
+            var status = (int?)json.GetValue("errorId");
+            var taskId = (string)json.GetValue("request")!;
+            var error = (string)json.GetValue("errorCode")!;
 
-            if (statusSend != "1" || string.IsNullOrEmpty(requestSend))
+            if (status > 0 || string.IsNullOrEmpty(taskId))
             {
-                return null;
+                return (null, error);
             }
-            return requestSend;
+            return (taskId, null);
         }
 
-        public static async Task<string?> GetStatementAsync(UserInfo user)
+        public override async Task<CaptchaResult?> GetCaptchaAnswerAsync(string captchaId)
         {
-            var getStatementRequestObject = new GetStatementRequest
+
+            var jsonObject = new JObject
             {
-                clientPubKey = user.ClientPubKey,
-                DT = user.DT,
-                PM = user.PM,
-                OV = user.OV,
-                lang = user.Lang,
-                accountNo = user.AccountNo,
-                accountType = user.AccountType,
-                fromDate = DateTime.Now.AddDays(-7).ToString("dd/MM/yyyy"),
-                toDate = DateTime.Now.ToString("dd/MM/yyyy"),
-                pageIndex = 0,
-                lengthInPage = 999999,
-                stmtDate = "",
-                stmtType = "",
-                mid = 14,
-                cif = user.CIF,
-                user = user.Username,
-                mobileId = user.MobileID,
-                clientId = user.ClientID,
-                sessionId = user.SessionID
+                {"clientKey", Util.ANTI_CAPTCHA_KEY},
+                {"taskId", captchaId}
             };
 
-            using var getStatementRequest = new HttpRequestMessage(HttpMethod.Post, "/bank-service/v1/transaction-history");
-
-            var getStatementMessage = Util.EncryptRequest(getStatementRequestObject);
-            var getStatementContent = new StringContent(JsonConvert.SerializeObject(getStatementMessage), Encoding.UTF8, "application/json");
-            getStatementRequest.Headers.Add("Accept-Language", "vi");
-            getStatementRequest.Headers.Add("Accept", "application/json");
-            getStatementRequest.Headers.Add("X-Channel", "Web");
-            getStatementRequest.Headers.Add("X-Request-ID", Util.CreateEpochTime());
-            getStatementRequest.Content = getStatementContent;
-            var getStatementResponse = await client.SendAsync(getStatementRequest);
-
-            if (!getStatementResponse.IsSuccessStatusCode)
+            using var request = new HttpRequestMessage(HttpMethod.Post, Util.ANTI_CAPTCHA_RESULT);
+            var content = new StringContent(JsonConvert.SerializeObject(jsonObject), Encoding.UTF8, "application/json");
+            request.Content = content;
+            var responseMessage = await client.SendAsync(request);
+            if (!responseMessage.IsSuccessStatusCode)
             {
-                Console.WriteLine("LoginAsync: HTTP Request returning bad !");
-                Log.Fatal("HTTP Request returning bad !");
+                return null;
+            }
+            var result = await responseMessage.Content.ReadAsStringAsync();
+
+            var captchaRes = JsonConvert.DeserializeObject<AntiCaptchaResponse>(result);
+
+            if (captchaRes == null)
+            {
                 return null;
             }
 
-            var getStatementResult = await getStatementResponse.Content.ReadAsStringAsync();
-            var response = Util.DecryptResponse(JsonConvert.DeserializeObject<Message>(getStatementResult));
-            Log.Information("{@result}", response);
-            if (response != null)
+            if (captchaRes.ErrorId > 0)
             {
-                return response;
-            }
-            return null;
-        }
-
-        public override async Task<(bool isReady, string? result, string? errorDesc)> GetCaptchaAnswerAsync(string captchaId)
-        {
-            var uriBuilderResult = new UriBuilder(Util.CAPTCHA_RESULT);
-            var paramsQueryResult = HttpUtility.ParseQueryString(uriBuilderResult.Query);
-            paramsQueryResult.Add("key", Util.CAPTCHA_KEY);
-            paramsQueryResult.Add("action", "get");
-            paramsQueryResult.Add("id", captchaId);
-            paramsQueryResult.Add("json", "1");
-
-            uriBuilderResult.Query = paramsQueryResult.ToString();
-
-            var response2CaptchaResult = await client.GetAsync(uriBuilderResult.Uri.ToString());
-            var result2CaptchaResult = await response2CaptchaResult.Content.ReadAsStringAsync();
-
-            var json2CaptchaResult = JObject.Parse(result2CaptchaResult);
-            var status = (string?)json2CaptchaResult.GetValue("status");
-            var request = (string?)json2CaptchaResult.GetValue("request");
-            var jsonCookies = (JArray?)json2CaptchaResult.GetValue("json_cookies");
-
-            if (jsonCookies != null && jsonCookies.Count > 0)
-            {
-                Util.AddCookiesFromJson(handler.CookieContainer, jsonCookies);
+                return new CaptchaResult
+                {
+                    ErrorDesc = captchaRes.ErrorCode
+                };
             }
 
-            if (json2CaptchaResult.ContainsKey("error_text"))
+            if (captchaRes.Status == "processing")
             {
-                var errorText = (string?)json2CaptchaResult.GetValue("error_text");
-                return (true, request, errorText);
+                return new CaptchaResult
+                {
+                    IsReady = false
+                };
             }
 
-            if (status == "1")
+            //READY
+            return new CaptchaResult
             {
-                return (true, request, null);
-            }
-            if (status == "0" && request == "CAPCHA_NOT_READY")
-            {
-                return (false, null, null);
-            }
-            return (true, null, null);
+                IsReady = true,
+                Answer = captchaRes.Solution.GRecaptchaResponse
+            };
         }
     }
 }

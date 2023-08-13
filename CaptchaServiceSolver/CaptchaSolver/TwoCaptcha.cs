@@ -20,7 +20,7 @@ namespace CaptchaServiceSolver.CaptchaSolver
             QueryParams = queryParams;
         }
 
-        public override async Task<string?> SendCaptchaAsync(RecaptchaChallenge key)
+        public override async Task<(string? taskId, string? error)> SendCaptchaAsync()
         {
             var uriBuilderSend = new UriBuilder(Util.TWO_CAPTCHA_SEND);
             var paramsQuerySend = HttpUtility.ParseQueryString(string.Empty);
@@ -28,17 +28,22 @@ namespace CaptchaServiceSolver.CaptchaSolver
             uriBuilderSend.Query = paramsQuerySend.ToString();
 
             var response = await client.GetAsync(uriBuilderSend.Uri.ToString());
+            if (!response.IsSuccessStatusCode)
+            {
+                return (null, "HTTP FAIL !");
+            }
             var result = await response.Content.ReadAsStringAsync();
 
             var json = JObject.Parse(result);
-            var statusSend = (string?)json.GetValue("status");
-            var requestSend = (string?)json.GetValue("request");
+            var status = (string?)json.GetValue("status");
+            var taskId = (string?)json.GetValue("request");
+            var error_text = (string?)json.GetValue("error_text");
 
-            if (statusSend != "1" || string.IsNullOrEmpty(requestSend))
+            if (status != "1" || string.IsNullOrEmpty(taskId))
             {
-                return null;
+                return (null, error_text);
             }
-            return requestSend;
+            return (taskId, null);
         }
 
         public override async Task<CaptchaResult?> GetCaptchaAnswerAsync(string captchaId)
@@ -53,12 +58,11 @@ namespace CaptchaServiceSolver.CaptchaSolver
             uriBuilderResult.Query = paramsQueryResult.ToString();
 
             var response2CaptchaResult = await client.GetAsync(uriBuilderResult.Uri.ToString());
-            var result2CaptchaResult = await response2CaptchaResult.Content.ReadAsStringAsync();
-
-            if(!response2CaptchaResult.IsSuccessStatusCode)
+            if (!response2CaptchaResult.IsSuccessStatusCode)
             {
                 return null;
             }
+            var result2CaptchaResult = await response2CaptchaResult.Content.ReadAsStringAsync();
 
             var json2CaptchaResult = JObject.Parse(result2CaptchaResult);
             var status = (int?)json2CaptchaResult.GetValue("status");
@@ -69,7 +73,6 @@ namespace CaptchaServiceSolver.CaptchaSolver
             return new CaptchaResult
             {
                 IsReady = status == 0 && request == "CAPCHA_NOT_READY",
-                Status = status is null ? -1 : status.Value,
                 Answer = request!,
                 ErrorDesc = errorText,
                 Cookies = jsonCookies
