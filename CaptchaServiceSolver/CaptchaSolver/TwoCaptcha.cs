@@ -13,15 +13,18 @@ namespace CaptchaServiceSolver.CaptchaSolver
 {
     public class TwoCaptcha : CaptchaSolver
     {
-        public NameValueCollection QueryParams { get; set; }
-
-        public TwoCaptcha(NameValueCollection queryParams) : base()
+        public NameValueCollection? QueryParams { get; set; }
+        
+        public TwoCaptcha(string key) : base(key)
         {
-            QueryParams = queryParams;
         }
 
         public override async Task<(string? taskId, string? error)> SendCaptchaAsync()
         {
+            if(QueryParams == null)
+            {
+                return (null, "Please input params !");
+            }
             var uriBuilderSend = new UriBuilder(Util.TWO_CAPTCHA_SEND);
             var paramsQuerySend = HttpUtility.ParseQueryString(string.Empty);
             paramsQuerySend.Add(QueryParams);
@@ -50,7 +53,7 @@ namespace CaptchaServiceSolver.CaptchaSolver
         {
             var uriBuilderResult = new UriBuilder(Util.TWO_CAPTCHA_RESULT);
             var paramsQueryResult = HttpUtility.ParseQueryString(uriBuilderResult.Query);
-            paramsQueryResult.Add("key", Util.TWO_CAPTCHA_KEY);
+            paramsQueryResult.Add("key", Key);
             paramsQueryResult.Add("action", "get");
             paramsQueryResult.Add("id", captchaId);
             paramsQueryResult.Add("json", "1");
@@ -72,8 +75,8 @@ namespace CaptchaServiceSolver.CaptchaSolver
 
             return new CaptchaResult
             {
-                IsReady = status == 0 && request == "CAPCHA_NOT_READY",
-                Answer = request!,
+                IsReady = !(status == 0 && request == "CAPCHA_NOT_READY"),
+                Answer = request,
                 ErrorDesc = errorText,
                 Cookies = jsonCookies
             };

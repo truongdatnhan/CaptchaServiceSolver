@@ -9,17 +9,14 @@ namespace CaptchaServiceSolver
     public static class Util
     {
         //2CAPTCHA
-        public const string TWO_CAPTCHA_KEY = "ffe849036e5a0fc02ece06f1c626d76b";
         public const string TWO_CAPTCHA_SEND = "http://2captcha.com/in.php";
         public const string TWO_CAPTCHA_RESULT = "http://2captcha.com/res.php";
 
         //ANTI_CAPTCHA
-        public const string ANTI_CAPTCHA_KEY = "e33ce396487f9db57c0f167234b91895";
         public const string ANTI_CAPTCHA_SEND = "https://api.anti-captcha.com/createTask";
         public const string ANTI_CAPTCHA_RESULT = "https://api.anti-captcha.com/getTaskResult";
 
         //CAPTCHA69
-        public const string CAPTCHA69_KEY = "point_fc769b5d9dbb8536e943ea62a5ba6506";
         public const string CAPTCHA69_SEND = "https://captcha69.com/in.php";
         public const string CAPTCHA69_RESULT = "https://captcha69.com/res.php";
 

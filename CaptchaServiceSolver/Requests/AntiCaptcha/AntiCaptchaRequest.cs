@@ -27,16 +27,16 @@ namespace CaptchaServiceSolver.Requests.AntiCaptcha
     public class AntiCaptchaTask
     {
 
-        [JsonPropertyName("type")]
+        [JsonProperty("type")]
         public string Type { get; set; }
 
-        [JsonPropertyName("websiteURL")]
+        [JsonProperty("websiteURL")]
         public string WebsiteURL { get; set; }
 
-        [JsonPropertyName("websiteKey")]
+        [JsonProperty("websiteKey")]
         public string WebsiteKey { get; set; }
 
-        [JsonPropertyName("enterprisePayload")]
+        [JsonProperty("enterprisePayload")]
         public JObject EnterprisePayload { get; set; }
 
         public AntiCaptchaTask(string type, string websiteURL, string websiteKey, Dictionary<string, string> enterprisePayload)
