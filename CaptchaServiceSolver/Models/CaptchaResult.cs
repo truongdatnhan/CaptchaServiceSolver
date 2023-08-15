@@ -10,7 +10,7 @@ namespace CaptchaServiceSolver.Models
     public class CaptchaResult
     {
         public bool IsReady { get; set; }
-        public string Answer { get; set; } = default!;
+        public string? Answer { get; set; }
         public string? ErrorDesc { get; set; }
         public JArray? Cookies { get; set; }
     }

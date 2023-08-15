@@ -13,8 +13,8 @@ namespace CaptchaServiceSolver.CaptchaSolver
     {
         protected HttpClient client;
         protected HttpClientHandler handler;
-
-        protected CaptchaSolver()
+        protected string Key { get; set; }
+        protected CaptchaSolver(string key)
         {
             handler = new HttpClientHandler();
             handler.AllowAutoRedirect = true;
@@ -23,6 +23,7 @@ namespace CaptchaServiceSolver.CaptchaSolver
             client = new HttpClient(handler);
             client.DefaultRequestHeaders.UserAgent.TryParseAdd(Util.USER_AGENT);
             client.DefaultRequestHeaders.Add("Connection", "keep-alive");
+            Key = key;
         }
 
         public abstract Task<(string? taskId, string? error)> SendCaptchaAsync();

@@ -17,11 +17,10 @@ namespace CaptchaServiceSolver.CaptchaSolver
 {
     public class AntiCaptcha : CaptchaSolver
     {
-        public AntiCaptchaRequest Request { get; set; }
+        public AntiCaptchaRequest? Request { get; set; }
 
-        public AntiCaptcha(AntiCaptchaRequest request) : base()
+        public AntiCaptcha(string key) : base(key)
         {
-            this.Request = request;
         }
 
         public override async Task<(string? taskId, string? error)> SendCaptchaAsync()
@@ -38,12 +37,12 @@ namespace CaptchaServiceSolver.CaptchaSolver
 
             var json = JObject.Parse(result);
             var status = (int?)json.GetValue("errorId");
-            var taskId = (string)json.GetValue("request")!;
-            var error = (string)json.GetValue("errorCode")!;
+            var taskId = (string?)json.GetValue("taskId");
+            var errorCode = (string?)json.GetValue("errorCode");
 
             if (status > 0 || string.IsNullOrEmpty(taskId))
             {
-                return (null, error);
+                return (null, errorCode);
             }
             return (taskId, null);
         }
@@ -53,7 +52,7 @@ namespace CaptchaServiceSolver.CaptchaSolver
 
             var jsonObject = new JObject
             {
-                {"clientKey", Util.ANTI_CAPTCHA_KEY},
+                {"clientKey", Key},
                 {"taskId", captchaId}
             };
 
@@ -66,35 +65,23 @@ namespace CaptchaServiceSolver.CaptchaSolver
                 return null;
             }
             var result = await responseMessage.Content.ReadAsStringAsync();
-
-            var captchaRes = JsonConvert.DeserializeObject<AntiCaptchaResponse>(result);
+            var settings = new JsonSerializerSettings
+            {
+                NullValueHandling = NullValueHandling.Ignore
+            };
+            var captchaRes = JsonConvert.DeserializeObject<AntiCaptchaResponse>(result, settings);
 
             if (captchaRes == null)
             {
                 return null;
             }
 
-            if (captchaRes.ErrorId > 0)
-            {
-                return new CaptchaResult
-                {
-                    ErrorDesc = captchaRes.ErrorCode
-                };
-            }
-
-            if (captchaRes.Status == "processing")
-            {
-                return new CaptchaResult
-                {
-                    IsReady = false
-                };
-            }
-
             //READY
             return new CaptchaResult
             {
-                IsReady = true,
-                Answer = captchaRes.Solution.GRecaptchaResponse
+                IsReady = captchaRes.Status == "processing" ? false : true,
+                Answer = captchaRes.Status == "ready" ? captchaRes.Solution.GRecaptchaResponse : null,
+                ErrorDesc = captchaRes.ErrorId > 0 ? captchaRes.ErrorCode : null
             };
         }
     }
